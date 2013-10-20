@@ -29,17 +29,17 @@
           }
           cf.name <- new.conf$cluster.functions$name
           if (is.null(cf.name)) {
-              workers <- NA_integer_
+              n.workers <- NA_integer_
           } else {
-              workers <- switch(cf.name,
+              n.workers <- switch(cf.name,
                  "Multicore"=getNumberCPUs(new.conf),
                  "SSH"=sum(getNumberCPUs(new.conf)),
                  NA_integer_)
           }
-        }
-        workers <- as.integer(workers)
+        } else n.workers <- workers
+        n.workers <- as.integer(n.workers)
 
-        initFields(workers=workers, conf.pars=new.conf)
+        initFields(workers=n.workers, conf.pars=new.conf)
     },
 
     show = function() {
