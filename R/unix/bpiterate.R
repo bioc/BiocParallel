@@ -1,7 +1,7 @@
 ## This multi-core implementation of bpiterate() is a modified
 ## version of sclapply() by Gregoire Pau.
 
-.bpiterate <- function(ITER, FUN, ..., REDUCE, init,
+.bpiterate_multicore <- function(ITER, FUN, ..., REDUCE, init,
     reduce.in.order = FALSE, mc.set.seed = TRUE, mc.silent = FALSE, 
     mc.cores = getOption("mc.cores", 2L),
     mc.cleanup = TRUE)
@@ -17,51 +17,52 @@
     pnodes <- vector(mode="list", mc.cores) ## node process
     jnodes <- rep(NA, mc.cores)             ## node job id
     rindex <- 1                             ## reducer index
-    if (!missing(REDUCE) & !missing(init)) res <- init
+    res <- list()
+    if (!missing(REDUCE) & !missing(init))
+        res <- init
 
     ## cleanup based on mclapply
     on.exit(.cleanup(pnodes[!sapply(pnodes, is.null)], mc.cleanup))
 
-    collect.timeout <- 2                    ## wait between iterations
     i <- 0; inextdata <- NULL
     repeat {
         ## new job to process?
-        if (is.null(inextdata)) inextdata <- ITER()
+        if (is.null(inextdata))
+            inextdata <- ITER()
         ## all jobs done?
-        if (is.null(inextdata)) {
-            if (length(sjobs)==0) break     ## no jobs have been run
-            if (all(sjobs=="done")) break
-        }
+        if (is.null(inextdata))
+            if ((length(sjobs) == 0) || (all(sjobs == "done")))
+                break
 
         ## fire FUN(inextdata) on node i
         repeat {
+            fire <- TRUE
             i <- (i %% length(pnodes)) + 1L
             process <- pnodes[[i]]
             if (!is.null(process)) {
-                status <- mccollect(process, wait=FALSE, 
-                                    timeout=collect.timeout)
+                status <- mccollect(process, wait=FALSE)
                 if (is.null(status)) {
                     ## node busy
                     fire <- FALSE
                 } else {
                     ## node done
-                    mccollect(process)      ## kill
+                    mccollect(process)      ## kill; is this needed?
                     jindex <- jnodes[i]
-                    rjobs[jindex] <- status
+                    rjobs[[jindex]] <- status[[1L]]
                     sjobs[jindex] <- "done"
 
                     ## reduce.in.order = TRUE
                     if (!missing(REDUCE) && reduce.in.order) {
                         if (jindex == 1) {
                             if (!missing(init))
-                                res <- REDUCE(init, unlist(rjobs[jindex]))
+                                res <- REDUCE(init, rjobs[[jindex]])
                             else
-                                res <- unlist(rjobs[jindex])
-                            rjobs[jindex] <- NA
+                                res <- rjobs[[jindex]]
+                            rjobs[[jindex]] <- NA
                             rindex <- rindex + 1 
                             while (sjobs[rindex] == "done") {
-                                res <- REDUCE(res, unlist(rjobs[rindex]))
-                                rjobs[rindex] <- NA 
+                                res <- REDUCE(res, rjobs[[rindex]])
+                                rjobs[[rindex]] <- NA 
                                 if (rindex == length(sjobs))
                                     break
                                 else
@@ -69,8 +70,8 @@
                             }
                         } else if (jindex == rindex) { 
                             while (sjobs[rindex] == "done") {
-                                res <- REDUCE(res, unlist(rjobs[rindex]))
-                                rjobs[rindex] <- NA
+                                res <- REDUCE(res, rjobs[[rindex]])
+                                rjobs[[rindex]] <- NA
                                 if (rindex == length(sjobs))
                                     break
                                 else
@@ -79,15 +80,12 @@
                         }
                     ## reduce.in.order = FALSE 
                     } else if (!missing(REDUCE) && !reduce.in.order) {
-                        if (exists("res"))
+                        if (length(res))
                             res <- REDUCE(res, unlist(status))
                         else
                             res <- unlist(status)
                     }
                 }
-            } else {
-                ## virgin node
-                fire <- TRUE
             }
 
             ## fire a new job
