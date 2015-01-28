@@ -83,18 +83,11 @@ test_bpiterate_REDUCE <- function() {
         checkIdentical(unlist(res, use.names=FALSE), "0123")
 
         ITER <- .lazyCount(workers)
-        res <- bpiterate(ITER, FUN, BPPARAM=param, REDUCE=paste0, 
-                         init=0, reduce.in.order=FALSE)
+        res <- quiet(bpiterate(ITER, FUN, BPPARAM=param, 
+            REDUCE=paste0, init=0, reduce.in.order=FALSE))
         checkIdentical(unlist(res, use.names=FALSE), "0123")
     }
 
     closeAllConnections()
     TRUE
 }
-
-    workers <- 3
-    FUN <- function(count, ...) rep(count, 10)
-    param <- MulticoreParam(workers)
-
-
-
