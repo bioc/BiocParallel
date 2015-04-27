@@ -23,7 +23,7 @@ bpslaveLoop <- function(master)
                 success <- TRUE
                 gc(reset=TRUE)
                 t1 <- proc.time()
-                value <- tryCatch(docall(msg$data$fun, msg$data$args))
+                value <- docall(msg$data$fun, msg$data$args)
                 t2 <- proc.time()
                 node <- Sys.info()["nodename"]
                 value <- list(type = "VALUE", value = value, success = success,
