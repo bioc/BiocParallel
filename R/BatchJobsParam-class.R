@@ -12,8 +12,7 @@
         reg.pars="list",
         submit.pars="list",
         conf.pars="list",
-        cleanup="logical",
-        progressbar="logical"),
+        cleanup="logical"),
     methods=list(
         initialize = function(..., 
             conf.pars=list(), 
@@ -49,9 +48,11 @@
         show = function() {
             ## TODO more output
             callSuper()
-            cat("bpisup:", bpisup(.self), "\n")
-            cat("cleanup:", .self$cleanup, "\n")
-            cat("progressbar:", .self$progressbar, "\n")
+            cat("  bpworkers:", bpworkers(.self),
+                   "; bpisup:", bpisup(.self), "\n", sep="")
+            cat("  bpstopOnError:", bpstopOnError(.self),
+                   "; bpprogressbar:", bpprogressbar(.self), "\n", sep="")
+            cat("  cleanup:", .self$cleanup, "\n", sep="")
         })
 )
 
@@ -60,6 +61,8 @@ BatchJobsParam <-
         work.dir=getwd(), stop.on.error=FALSE, seed=NULL, resources=NULL,
         conffile=NULL, cluster.functions=NULL, progressbar=TRUE, ...)
 {
+    if (!catch.errors)
+        warning("'catch.errors' has been deprecated")
     if (!"package:BatchJobs" %in% search()) {
         tryCatch({
             attachNamespace("BatchJobs")
@@ -100,31 +103,27 @@ setMethod(bpbackend, "BatchJobsParam", function(x, ...) getConfig())
 ###
 
 setMethod(bplapply, c("ANY", "BatchJobsParam"),
-    function(X, FUN, ..., BPRESUME=getOption("BiocParallel.BPRESUME", FALSE),
-        BPPARAM=bpparam())
-{
-    bpmapply(FUN, X, MoreArgs=list(...), SIMPLIFY=FALSE,
-        BPRESUME=BPRESUME, BPPARAM=BPPARAM)
-})
-
-setMethod(bpmapply, c("ANY", "BatchJobsParam"),
-    function(FUN, ..., MoreArgs=NULL, SIMPLIFY=TRUE, USE.NAMES=TRUE,
-        BPRESUME=getOption("BiocParallel.BPRESUME", FALSE), BPPARAM=bpparam())
+    function(X, FUN, ..., BPREDO=list(), BPPARAM=bpparam())
 {
     FUN <- match.fun(FUN)
-    if (BPRESUME)
-        return(.bpresume_mapply(FUN=FUN, ..., MoreArgs=MoreArgs,
-            SIMPLIFY=SIMPLIFY, USE.NAMES=USE.NAMES, BPPARAM=BPPARAM))
-    if (!bpschedule(BPPARAM)) {
-        result <- bpmapply(FUN=FUN, ..., MoreArgs=MoreArgs, SIMPLIFY=SIMPLIFY,
-            USE.NAMES=USE.NAMES, BPRESUME=BPRESUME,
-            BPPARAM=SerialParam())
-        return(result)
+    if (length(BPREDO)) {
+        if (all(idx <- !bpok(BPREDO)))
+            stop("no error detected in 'BPREDO'")
+        if (length(BPREDO) != length(X))
+            stop("Cannot resume: length mismatch in arguments")
+        message("Resuming previous calculation ... ")
+        X <- X[idx]
     }
+    nms <- names(X)
+
+    if (!length(X))
+        return(list())
+    if (!bpschedule(BPPARAM)) 
+        return(bplapply(X, FUN, ..., BPPARAM=SerialParam()))
 
     ## turn progressbar on/off
     prev.pb <- getOption("BBmisc.ProgressBar.style")
-    options(BBmisc.ProgressBar.style=c("off", "text")[BPPARAM$progressbar+1L])
+    options(BBmisc.ProgressBar.style=c("off", "text")[bpprogressbar(BPPARAM)+1L])
     on.exit(options(BBmisc.ProgressBar.style=prev.pb))
 
     ## create registry, handle cleanup
@@ -148,13 +147,10 @@ setMethod(bpmapply, c("ANY", "BatchJobsParam"),
             indent=4, exdent=4)
         warning(paste(txt, collapse="\n"))
     }
-
     ## define jobs and submit
-    if (is.null(MoreArgs))
-        MoreArgs <- list()
     if (BPPARAM$catch.errors)
         FUN <- .composeTry(FUN)
-    ids <- suppressMessages(batchMap(reg, fun=FUN, ..., more.args=MoreArgs))
+    ids <- suppressMessages(batchMap(reg, fun=FUN, X, more.args=list(...)))
 
     ## submit, possibly chunked
     pars <- c(list(reg=reg), BPPARAM$submit.pars)
@@ -168,35 +164,19 @@ setMethod(bpmapply, c("ANY", "BatchJobsParam"),
     waitForJobs(reg, ids, timeout=Inf,
         stop.on.error=(BPPARAM$stop.on.error && !BPPARAM$catch.errors))
 
-    # identify missing results
-    ok <- ids %in% suppressMessages(findDone(reg))
-    if (BPPARAM$catch.errors) {
-        results <- loadResults(reg, ids, use.names="none", missing.ok=TRUE)
-        ok <- ok & !vapply(results, inherits, logical(1L), what="remote-error")
+    ## FIXME: pass USE.NAMES?
+    res <- loadResults(reg, ids, use.names="none")
+    if (!is.null(res)) {
+        names(res) <- nms
     }
-
-    # handle errors
-    if (!all(ok)) {
-      if (BPPARAM$catch.errors) {
-          # already fetched the results ...
-          results <- .rename(results, list(...), USE.NAMES=USE.NAMES)
-          LastError$store(results=results, is.error=!ok, throw.error=TRUE)
-      }
-      stop(simpleError(as.character(getErrorMessages(reg, head(ids[!ok], 1L)))))
-    }
-
-    if (!BPPARAM$catch.errors) { # results not fetched yet
-        results <- loadResults(reg, ids, use.names="none")
-    }
-
-    .simplify(.rename(results, list(...), USE.NAMES=USE.NAMES),
-              SIMPLIFY=SIMPLIFY)
+    if (length(BPREDO)) {
+        BPREDO[idx] <- res
+        BPREDO 
+    } else res
 })
 
 setMethod(bpiterate, c("ANY", "ANY", "BatchJobsParam"),
     function(ITER, FUN, ..., BPPARAM=bpparam())
 {
-    stop(paste0("bpiterate is only supported for MulticoreParam and ",
-                "SerialParam"))
+    stop(paste0("bpiterate not supported for BatchJobsParam"))
 })
-

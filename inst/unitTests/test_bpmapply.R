@@ -1,78 +1,79 @@
-library(doParallel)                     # FIXME: unload?
-.fork_not_windows <-
-    function(expected, expr)
+library(doParallel)  # FIXME: unload?
+quiet <- suppressWarnings
+
+test_bpmapply_Params <- function() 
 {
-    err <- NULL
-    obs <- tryCatch(expr, error=function(e) {
-        if (!all(grepl("fork clusters are not supported on Windows",
-                       conditionMessage(e))))
-            err <<- conditionMessage(e)
-        expected
-    })
-    checkTrue(is.null(err))
-    checkIdentical(expected, obs)
-}
+    registerDoParallel(2)
+    params <- list(serial=SerialParam(),
+                   snow=SnowParam(2),
+                   mc=MulticoreParam(2),
+                   dopar=DoparParam(),
+                   batchjobs=BatchJobsParam(progressbar=FALSE))
 
-params <- list(serial=SerialParam(),
-              snow1=SnowParam(2, "SOCK"),
-              batchjobs=BatchJobsParam(),
-              multi=MulticoreParam(),
-              dopar=DoparParam())
-dop <- registerDoParallel(cores=2)
-
-test_bpmapply_Params <- function() {
     x <- 1:10
     y <- rev(x)
     f <- function(x, y) x + y
     expected <- x + y
     for (param in params) {
-      .fork_not_windows(expected, bpmapply(f, x, y, BPPARAM=param))
+      current <- quiet(bpmapply(f, x, y, BPPARAM=param))
+      checkIdentical(expected, current)
     }
 
     # test names and simplify
     x <- setNames(1:5, letters[1:5])
     for (param in params) {
         for (catch.errors in c(FALSE, TRUE)) {
-            param$catch.errors <- catch.errors
+            bpcatchErrors(param) <- catch.errors
             for (SIMPLIFY in c(FALSE, TRUE)) {
                 for (USE.NAMES in c(FALSE, TRUE)) {
-                  expected <- mapply(identity, x, USE.NAMES=USE.NAMES,
-                      SIMPLIFY=SIMPLIFY)
-                  .fork_not_windows(expected,
-                      bpmapply(identity, x, USE.NAMES=USE.NAMES,
-                          SIMPLIFY=SIMPLIFY, BPPARAM=param))
+                  expected <- mapply(identity, x, 
+                                     USE.NAMES=USE.NAMES,
+                                     SIMPLIFY=SIMPLIFY)
+                  current <- quiet(bpmapply(identity, x, 
+                                            USE.NAMES=USE.NAMES,
+                                            SIMPLIFY=SIMPLIFY, 
+                                            BPPARAM=param))
+                  checkIdentical(expected, current)
                 }
             }
         }
     }
-
 
     # test MoreArgs
     x <- setNames(1:5, letters[1:5])
     f <- function(x, m) { x + m }
     expected <- mapply(f, x, MoreArgs=list(m=1))
     for (param in params) {
-      .fork_not_windows(expected,
-          bpmapply(f, x, MoreArgs=list(m=1), BPPARAM=param))
+        current <- quiet(bpmapply(f, x, MoreArgs=list(m=1), BPPARAM=param))
+        checkIdentical(expected, current)
     }
 
     # test empty input
     for (param in params) {
-      .fork_not_windows(list(),
-        bpmapply(identity, BPPARAM=param)
-        )
+        current <- quiet(bpmapply(identity, BPPARAM=param))
+        checkIdentical(list(), current)
     }
 
+    closeAllConnections()
     TRUE
 }
 
 test_bpmapply_symbols <- function()
 {
-    X <- list(as.symbol(".XYZ"))
-    expected <- mapply(as.character, X)
-    for (ptype in names(params)) {
-        .fork_not_windows(expected,
-                          bpmapply(as.character, X, BPPARAM=params[[ptype]]))
+    registerDoParallel(2)
+    params <- list(serial=SerialParam(),
+                  snow=SnowParam(2),
+                  dopar=DoparParam())
+    if (.Platform$OS.type != "windows")
+        params$mc <- MulticoreParam(2)
+
+    x <- list(as.symbol(".XYZ"))
+    expected <- mapply(as.character, x)
+    for (param in names(params)) {
+        current <- bpmapply(as.character, x, BPPARAM=params[[param]])
+        checkIdentical(expected, current)
     }
+
+    closeAllConnections()
     TRUE
 }

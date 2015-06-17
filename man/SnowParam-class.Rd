@@ -14,7 +14,8 @@
 \alias{bpstart,SnowParam-method}
 \alias{bpstop,SnowParam-method}
 \alias{bpworkers,SnowParam-method}
-\alias{bplog<-,SnowParam,logical-method}
+\alias{bpworkers<-,SnowParam,numeric-method}
+\alias{bpworkers<-,SnowParam,character-method}
 
 % Accessors
 \alias{bplog}
@@ -25,6 +26,10 @@
 \alias{bpthreshold<-}
 \alias{bpthreshold,SnowParam-method}
 \alias{bpthreshold<-,SnowParam,character-method}
+\alias{bpRNGseed}
+\alias{bpRNGseed<-}
+\alias{bpRNGseed,SnowParam-method}
+\alias{bpRNGseed<-,SnowParam-method}
 \alias{bplogdir}
 \alias{bplogdir<-}
 \alias{bplogdir,SnowParam-method}
@@ -42,7 +47,6 @@
 % Other functions
 \alias{bpslaveLoop}
 \alias{bprunMPIslave}
-\alias{bpok}
 
 \title{Enable simple network of workstations (SNOW)-style parallel evaluation}
 
@@ -63,14 +67,15 @@
 
 SnowParam(workers = snowWorkers(), type=c("SOCK", "MPI", "FORK"),
           tasks = 0L, catch.errors=TRUE, stop.on.error = FALSE, 
-          log = FALSE, threshold = "INFO", logdir = character(), 
-          resultdir = character(), ...)
+          progressbar = FALSE, RNGseed = NULL, log = FALSE, 
+          threshold = "INFO", logdir = NA_character_, 
+          resultdir = NA_character_, ...)
 
 ## coercion 
 ## ------------------------------------
 
-\S4method{coerce}{SOCKcluster,SnowParam}(from, to)
-\S4method{coerce}{spawnedMPIcluster,SnowParam}(from, to)
+## as(SOCKcluster, SnowParam)
+## as(spawnedMPIcluster,SnowParam)
 
 ## detect workers 
 ## ------------------------------------
@@ -88,31 +93,42 @@ snowWorkers()
 
   \describe{
     \item{error handling:}{
-      Two flags control error handling: \code{catch.errors} and
-      \code{stop.on.error}.
+      The \code{catch.errors} field has been deprecated.
 
-      The \code{catch.errors} flag determines whether apply-like functions quit
-      with an error as soon as one task fails. When \code{FALSE}, this is the
-      default behavior seen in the \code{parallel} and \code{snow} packages; an
-      error is returned with no results.  When \code{TRUE}, errors are returned
-      for tasks that failed as well as results for those that completed
-      successfully.
+      By default all computations are attempted and partial results
+      are returned with any error messages.
+      \itemize{
+        \item \code{catch.errors} (DEPRECATED)
+              determines whether errors are caught and
+              returned with other results. When \code{TRUE}, all computations 
+              are attempted and output contains both errors and successfully 
+              completed results. When \code{FALSE}, the job is terminated as 
+              soon as the first error is hit and only the error message is 
+              returned (no results); this is the default behavior of the 
+              parent packages, e.g., \code{parallel}, \code{snow}, 
+              \code{foreach}.
+ 
+        \item \code{stop.on.error} controls whether the job stops after an 
+              error is thrown. When \code{TRUE}, the output contains all 
+              successfully completed results up to and including the error. 
+              When \code{FALSE}, all computations are attempted and
+              and successful results are returned along with any error messages.
 
-      \code{stop.on.error} offers and additional level of control and is only
-      applicable when \code{catch.errors == TRUE}. When this argument is
-      \code{TRUE} the job terminates upon the first error is encountered but the
-      results also contain the successfully completed tasks. \code{catch.errors}
-      must be \code{TRUE} when \code{stop.on.error} is \code{TRUE}. When
-      \code{FALSE}, the job runs to completion and all successfully completed
-      tasks are returned along with any error messages.
+        \item The \code{bpok(x)} function returns a \code{logical()} vector 
+              that is FALSE for any jobs that threw an error. The input 
+              \code{x} is a list output from a bp*apply function such as
+              \code{bplapply} or \code{bpmapply}. 
+      }
     }
     \item{logging:}{
       Logging is implemented on the workers with the \code{futile.logger}
-      package. When \code{bplog(BPPARAM) == TRUE} cluster workers use a script
-      in the \code{BiocParallel} package instead of \code{snow}. This modified
-      script captures warning and error messages and collects additional task
-      statistics such as gc output and node name.
-      
+      package. The argument to the constructor is \code{log} and the value is
+      accessed with \code{bplog(BPPARAM)}. When \code{log == TRUE}, the
+      \code{futile.logger} package is loaded on the workers.
+      A modified script in the \code{BiocParallel} package is run on the
+      workers and captures warnings, errors, and additional statistics such 
+      as gc output and node name.
+ 
       Any \code{futile.logger} messages the user provides in their function will
       be captured by the logging mechanism. Messages are returned real-time
       (i.e., as each tasks completes) instead of after all jobs have finished.
@@ -120,15 +136,30 @@ snowWorkers()
     \item{log and result files:}{
       Results and logs can be written to a file instead of returned to
       the workspace. Writing to files is done from the master as each task 
-      completes. These options are controlled with \code{logdir} 
-      and \code{resultdir}. 
+      completes. Options can be set with the \code{logdir} and 
+      \code{resultdir} fields in the constructor or with the accessors,
+      \code{bplogdir} and \code{bpresultdir}. 
     }
+    \item{random number generation:}{
+      \code{MulticoreParam} and \code{SnowParam} use the random number
+      generation support from the parallel package. These params are 
+      snow-derived clusters so the arguments for multicore-derived functions 
+      such as \code{mc.set.seed} and \code{mc.reset.stream} do not apply.
+ 
+      Random number generation is controlled through the param argument,
+      \code{RNGseed} which is passed to parallel::clusterSetRNGStream.
+      \code{clusterSetRNGStream} uses the L'Ecuyer-CMRG random number
+      generator and distributes streams to the members of a cluster. If
+      \code{RNGseed} is not NULL it serves as the seed to the streams,
+      otherwise the streams are set from the current seed of the master process
+      after selecting the L'Ecuyer generator. See ?\code{clusterSetRNGStream}
+      for more details.
+    }
+    NOTE: The \code{PSOCK} cluster from the \code{parallel} package does not 
+    support cluster options \code{scriptdir} and \code{useRscript}. \code{PSOCK}
+    is not supported because these options are needed to re-direct to an 
+    alternate worker script located in BiocParallel.
   }
-
-  NOTE: The \code{PSOCK} cluster from the \code{parallel} package does not 
-  support cluster options \code{scriptdir} and \code{useRscript}. Because
-  these options are needed to use an alternate worker script, \code{PSOCK} 
-  is not supported in \code{SnowParam}.
 
 }
 
@@ -137,9 +168,10 @@ snowWorkers()
   \describe{
     \item{}{
       \code{SnowParam(workers = snowWorkers(), type=c("SOCK", "MPI"),
-                      catch.errors = TRUE, stop.on.error = FALSE,
-                      log = FALSE, threshold = "INFO", logdir = character(), 
-                      resultdir = character(), ...)}:
+                      tasks = 0L, catch.errors = TRUE, stop.on.error = FALSE,
+                      progressbar = FALSE, RNGseed = NULL, log = FALSE, 
+                      threshold = "INFO", logdir = NA_character_, 
+                      resultdir = NA_character_, ...)}:
 
         Return an object representing a SNOW cluster. The cluster is not
         created until \code{bpstart} is called. Named arguments in \code{...} 
@@ -179,10 +211,18 @@ snowWorkers()
     element of \code{X} is sent to a worker and \code{tasks} is ignored.
   } 
   \item{catch.errors}{
+    DEPRECATED.
     \code{logical(1)} Enable the catching of errors and warnings.
   }
   \item{stop.on.error}{
     \code{logical(1)} Enable stop on error.
+  }
+  \item{progressbar}{
+    \code{logical(1)} Enable progress bar (based on plyr:::progress_text).
+  }
+  \item{RNGseed}{
+    \code{integer(1)} Seed for random number generation. Value is passed 
+    to parallel::clusterSetRNGStream.
   }
   \item{log}{
     \code{logical(1)} Enable logging.
@@ -201,15 +241,6 @@ snowWorkers()
   \item{\dots}{
     Additional arguments passed to \code{\link[snow]{makeCluster}}
   }
-  \item{from}{
-    A \code{SOCKcluster} or \code{spawnedMPIcluster} instance created
-    with \code{makeCluster} in the \code{parallel} or \code{snow} package.
-    Applicable to \code{coerce} methods only.
-  } 
-  \item{to}{
-    \code{character(1)} \dQuote{SnowParam}. Applicable to \code{coerce}
-    methods only.
-  }
 
 }
 
@@ -217,6 +248,16 @@ snowWorkers()
 
   In the following code, \code{x} is a \code{SnowParam} object.
   \describe{
+    \item{}{
+      \code{bpprogressbar(x, ...)}, \code{bpprogressbar(x) <- value}: 
+      Get or set the value to enable text progress bar. 
+      \code{value} must be a \code{logical(1)}.
+    }
+    \item{}{
+      \code{bpRNGseed(x, ...)}, \code{bpRNGseed(x) <- value}: 
+      Get or set the seed for random number generaton. \code{value} must be a
+      \code{numeric(1)}.
+    }
     \item{}{
       \code{bplog(x, ...)}, \code{bplog(x) <- value}: 
       Get or set the value to enable logging. \code{value} must be a
@@ -233,14 +274,14 @@ snowWorkers()
       \code{bplogdir(x, ...)}, \code{bplogdir(x) <- value}: 
       Get or set the directory for the log file. \code{value} must be a
       \code{character(1)} path, not a file name. The file is written out as
-      LOGFILE.out. If no \code{logdir} is provided and \code{bplog=TRUE} log
+      BPLOG.out. If no \code{logdir} is provided and \code{bplog=TRUE} log
       messages are sent to stdout.
     }
     \item{}{
       \code{bpresultdir(x, ...)}, \code{bpresultdir(x) <- value}: 
       Get or set the directory for the result files. \code{value} must be a
       \code{character(1)} path, not a file name. Separate files are written for
-      each job with the prefix JOB (e.g., JOB1, JOB2, etc.).  When no
+      each job with the prefix TASK (e.g., TASK1, TASK2, etc.).  When no
       \code{resultdir} is provided the results are returned to the session as
       \code{list}.
     }
@@ -253,7 +294,7 @@ snowWorkers()
   In the code below \code{x} is a \code{SnowParam} object.  See the
   ?\code{BiocParallelParam} man page for details on these accessors.
   \describe{
-    \item{}{\code{bpworkers(x, ...)}}
+    \item{}{\code{bpworkers(x, ...)}, \code{bpworkers(x) <- value}}
     \item{}{\code{bptasks(x, ...)}, \code{bptasks(x) <- value}}
     \item{}{\code{bpstart(x, ...)}}
     \item{}{\code{bpstop(x, ...)}}
@@ -357,9 +398,15 @@ snowWorkers()
 ## Job configuration:
 ## -----------------------------------------------------------------------
 
-## SnowParam supports distributed memory computing. Fields control the
-## division of tasks, error handling, logging and how results are returned. 
+## SnowParam supports distributed memory computing. The object fields
+## control the division of tasks, error handling, logging and 
+## result format.
 bpparam <- SnowParam()
+bpparam
+
+## Fields are modified with accessors of the same name:
+bplog(bpparam) <- TRUE
+bpresultdir(bpparam) <- "/myResults/"
 bpparam
 
 ## -----------------------------------------------------------------------
@@ -387,42 +434,58 @@ fun <- function(x) {
     }
 }
 
-## By default logging is off; turn it on with bplog():
-bpparam <- SnowParam(3)
-bplog(bpparam) <- TRUE
+## By default logging is off. Turn it on with the bplog()<- setter
+## or by specifying 'log = TRUE' in the constructor.
+bpparam <- SnowParam(3, log = TRUE)
 bplapply(X, fun, BPPARAM=bpparam)
 
 ## When a 'logdir' location is given the messages are redirected to a file:
 bplogdir(bpparam) <- tempdir()
-bplapply(X, fun, BPPARAM=bpparam)
+bplapply(X, fun, BPPARAM = bpparam)
 list.files(bplogdir(bpparam))
 
 ## -----------------------------------------------------------------------
 ## Managing results:
 ## -----------------------------------------------------------------------
 
-## Results are written to a file by providing a directory path in
-## 'resultdir'.
-bpparam <- SnowParam(2, type="SOCK", resultdir = tempdir())
-bplapply(X, fun, BPPARAM=bpparam)
+## By default results are returned as a list. When 'resultdir' is given
+## files are saved in the directory specified by job, e.g., 'TASK1.Rda', 
+## 'TASK2.Rda', etc.
+bpparam <- SnowParam(2, resultdir = tempdir())
+bplapply(X, fun, BPPARAM = bpparam)
+list.files(bpresultdir(bpparam))
 
 ## -----------------------------------------------------------------------
 ## Error handling:
 ## -----------------------------------------------------------------------
 
-## When 'stop.on.error' is TRUE, the method returns as soon as an error
-## is thrown.
-bpparam <- SnowParam(2, type="SOCK", stop.on.error=TRUE)
-res <- bplapply(list(1, "two", 3, 4), sqrt, BPPARAM=bpparam)
+## When 'stop.on.error' is TRUE the process returns as soon as an error 
+## is thrown. 
+bpparam <- SnowParam(2, stop.on.error = TRUE)
+bplapply(list(1, "two", 3, 4), sqrt, BPPARAM = bpparam)
+
+## When 'stop.on.error' is FALSE all computations are attempted. Partial
+## results are returned along with errors.
+bpparam <- SnowParam(2, stop.on.error = FALSE)
+res <- bplapply(list(1, "two", 3, 4), sqrt, BPPARAM = bpparam)
 res
 
-## bpok() returns TRUE for the elements that did not return an error.
+## Calling bpok() on the result list returns TRUE for elements with no error.
 bpok(res)
 
-## When 'stop.on.error' is FALSE, all results are computed.
-bpstopOnError(bpparam) <- FALSE 
-res <- bplapply(list(1, "two", 3, 4), sqrt, BPPARAM=bpparam)
-bpok(res)
+## -----------------------------------------------------------------------
+## Random number generation:
+## -----------------------------------------------------------------------
+
+## Random number generation is controlled with the 'RNGseed' field. 
+## This seed is passed to parallel::clusterSetRNGStream
+## which uses the L'Ecuyer-CMRG random number generator and distributes
+## streams to members of the cluster. If 'RNGseed' is not set (default NULL)
+## streams are set from the current seed of the master process after
+## selecting the L'Ecuyer-CMRG generator.
+
+bpparam <- SnowParam(3, RNGseed = 7739465)
+bplapply(seq_len(bpworkers(bpparam)), function(i) rnorm(1), BPPARAM = bpparam)
 
 }
 

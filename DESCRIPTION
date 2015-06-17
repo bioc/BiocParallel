@@ -1,11 +1,12 @@
 Package: BiocParallel
 Type: Package
 Title: Bioconductor facilities for parallel evaluation
-Version: 1.2.3
+Version: 1.2.4
 Authors@R: c(
     person("Bioconductor Package Maintainer",
         email="maintainer@bioconductor.org", role="cre"),
     person("Martin", "Morgan", role="aut"),
+    person("Valerie", "Obenchain", role="aut"),
     person("Michel", "Lang", email="michellang@gmail.com", role="aut"),
     person("Ryan", "Thompson", email="rct@thompsonclan.org", role="aut"))
 Description: This package provides modified versions and novel
@@ -24,7 +25,7 @@ Collate.unix: AllGenerics.R BiocParallelParam-class.R ErrorHandling.R
     bpvec-methods.R bpvectorize-methods.R bpworkers-methods.R
     bpaggregate-methods.R bpvalidate.R SnowParam-class.R MulticoreParam-class.R
     register.R SerialParam-class.R DoparParam-class.R SnowParam-utils.R
-    BatchJobsParam-class.R utilities.R unix/mclapply.R unix/pvec.R
+    BatchJobsParam-class.R progress.R utilities.R unix/mclapply.R unix/pvec.R
     unix/bpiterate.R unix/zzz.R
 Collate.windows: AllGenerics.R BiocParallelParam-class.R ErrorHandling.R
     bpbackend-methods.R bpisup-methods.R bplapply-methods.R bpmapply-methods.R
@@ -32,5 +33,5 @@ Collate.windows: AllGenerics.R BiocParallelParam-class.R ErrorHandling.R
     bpvec-methods.R bpvectorize-methods.R bpworkers-methods.R
     bpaggregate-methods.R bpvalidate.R SnowParam-class.R MulticoreParam-class.R
     register.R SerialParam-class.R DoparParam-class.R SnowParam-utils.R
-    BatchJobsParam-class.R utilities.R windows/zzz.R
+    BatchJobsParam-class.R progress.R utilities.R windows/zzz.R
 VignetteBuilder: knitr

@@ -21,6 +21,7 @@
 \alias{bpstop,ANY-method}
 \alias{bpstop,missing-method}
 \alias{bpworkers}
+\alias{bpworkers<-}
 \alias{bpworkers,missing-method}
 \alias{bpworkers,BiocParallelParam-method}
 \alias{bptasks}
@@ -35,6 +36,11 @@
 \alias{bpstopOnError,BiocParallelParam-method}
 \alias{bpstopOnError<-}
 \alias{bpstopOnError<-,BiocParallelParam,logical-method}
+\alias{bpstopOnError<-,DoparParam,logical-method}
+\alias{bpprogressbar}
+\alias{bpprogressbar,BiocParallelParam-method}
+\alias{bpprogressbar<-}
+\alias{bpprogressbar<-,BiocParallelParam,logical-method}
 
 % Other methods
 \alias{show,BiocParallel-method}
@@ -92,9 +98,10 @@
 
     \describe{
       \item{}{
-        \code{bpworkers(x, ...)}:
+        \code{bpworkers(x, ...)}, \code{bpworkers(x, ...)}:
         \code{integer(1)} or \code{character()}. Gets the number or names of 
-        the back-end workers.
+        the back-end workers. The setter is supported for SnowParam and 
+        MulticoreParam only.
       }
       \item{}{
         \code{bptasks(x, ...)}, \code{bptasks(x) <- value}:
@@ -104,18 +111,21 @@
         and \code{BatchJobsParam} have their own approach to dividing a job
         among workers. 
  
-        In this documentation a job is defined as a single call to a function,
-        \code{bplapply}, \code{bpmapply} etc. A task is the division of the
+        We define a job as a single call to a function such as \code{bplapply}, 
+        \code{bpmapply} etc. A task is the division of the
         \code{X} argument into chunks. When \code{tasks == 0} (default),
         \code{X} is divided by the number of workers. This approach distributes
         \code{X} in (approximately) equal chunks.
  
         A \code{tasks} value of > 0 dictates the total number of tasks. Values
-        can range from 1 (all of \code{X} to a single worker) to the length of 
+        can range from 1 (all of \code{X} to a single worker) to the length of
         \code{X} (each element of \code{X} to a different worker). 
  
         When the length of \code{X} is less than the number of workers each
         element of \code{X} is sent to a worker and \code{tasks} is ignored.
+        Another case where the \code{tasks} value is ignored is when using the
+        \code{bpiterate} function; the number of tasks are defined by the number
+        of data chunks returned by the \code{ITER} function. 
       }
       \item{}{
         \code{bpstart(x, ...)}:
@@ -136,6 +146,10 @@
         Gets or sets the parallel \code{bpbackend}. Not all back-ends can
         be retrieved; see \code{showMethods("backend")}.
       }
+      \item{progressbar}{
+        \code{logical(1)} Enable progress bar. Applicable to
+        \code{BatchJobsParam}, \code{SnowParam} and \code{MulticoreParam} only.
+      }
     }
   }
 
@@ -144,15 +158,30 @@
 
     \describe{
       \item{}{
-        \code{bpcatchErrors(x, ...)}, \code{bpcatchErrors(x) <- value}: 
-        Get or set the flag to determine if apply-like functions quit with an
-        error as soon as one application fails.  See ?\code{SnowParam} and
-        ?\code{BatchJobsParam} for details applicable to each class.
+        \code{bpcatchErrors(x, ...)}, \code{bpCatchErrors(x) <- value}:
+        \code{logical()}. Controls if errors are caught and returned with
+        completed results.
+
+        \code{catch.errors} determines whether errors are caught and
+        returned with other results. When \code{TRUE}, all computations 
+        are attempted and output contains both errors and successfully 
+        completed results. When \code{FALSE}, the job is terminated as 
+        soon as the first error is hit and only the error message is 
+        returned (no results); this is the default behavior of the 
+        parent packages, e.g., \code{parallel}, \code{snow}, 
+        \code{foreach}.
       }
       \item{}{
-        \code{bpstopOnError(x, ...)}, \code{bpstopOnError(x) <- value}: 
-        Get or set the flag to determine if all jobs should be stopped as
-        soon as one fails or if all should be attempted.
+        \code{bpstopOnError(x, ...)}, \code{bpstopOnError(x) <- value}:
+        \code{logical()}. Controls if the job stops when an error is hit.
+
+        \code{stop.on.error} controls whether the job stops after an 
+        error is thrown. When \code{TRUE}, the output contains all 
+        successfully completed results up to and including the error. 
+        Unlike \code{catch.errors == TRUE}, when 
+        \code{stop.on.error == TRUE} all computations stop once the 
+        error is hit. When \code{FALSE}, the job runs to completion 
+        and successful results are returned along with any error messages.
       }
     }
   }
@@ -170,12 +199,10 @@
     \describe{
       \item{}{
         \code{bpmapply(FUN, ..., MoreArgs=NULL, SIMPLIFY=TRUE, USE.NAMES=TRUE,
-                       BPRESUME=getOption("BiocParallel.BPRESUME", FALSE), 
                        BPPARAM=bpparam())}
       }
       \item{}{
         \code{bplapply(X, FUN, ..., 
-                       BPRESUME = getOption("BiocParallel.BPRESUME", FALSE),
                        BPPARAM=bpparam())}
       }
       \item{}{

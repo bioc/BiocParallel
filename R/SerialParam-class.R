@@ -8,13 +8,34 @@
 
 .SerialParam <- setRefClass("SerialParam",
     contains="BiocParallelParam",
-    fields=list()
+    fields=list(
+        log="logical",
+        threshold="ANY"),
+    methods=list(
+        initialize = function(..., 
+            log=FALSE,
+            threshold="INFO")
+        { 
+            initFields(log=log, threshold=threshold)
+            callSuper(...)
+        },
+        show = function() {
+            callSuper()
+            cat("  bplog:", bplog(.self),
+                   "; bpthreshold:", names(bpthreshold(.self)), "\n", sep="")
+        })
 )
 
-SerialParam <-
-    function()
+SerialParam <- function(catch.errors=TRUE, stop.on.error=FALSE, 
+                        log=FALSE, threshold="INFO")
 {
-    .SerialParam(workers=1L)
+    if (!catch.errors)
+        warning("'catch.errors' has been deprecated")
+    x <- .SerialParam(workers=1L, 
+                      catch.errors=catch.errors, stop.on.error=stop.on.error,
+                      log=log, threshold=.THRESHOLD(threshold)) 
+    validObject(x)
+    x
 }
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -25,25 +46,66 @@ setMethod(bpworkers, "SerialParam", function(x, ...) 1L)
 
 setMethod(bpisup, "SerialParam", function(x, ...) TRUE)
 
+setMethod("bplog", "SerialParam",
+    function(x, ...)
+{
+    x$log
+})
+
+setReplaceMethod("bplog", c("SerialParam", "logical"),
+    function(x, ..., value)
+{
+    x$log <- value 
+    validObject(x)
+    x
+})
+
+setMethod("bpthreshold", "SerialParam",
+    function(x, ...)
+{
+    x$threshold
+})
+
+setReplaceMethod("bpthreshold", c("SerialParam", "character"),
+    function(x, ..., value)
+{
+    nms <- c("TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL")
+    if (!value %in% nms)
+        stop(paste0("'value' must be one of ",
+             paste(sQuote(nms), collapse=", ")))
+    x$threshold <- .THRESHOLD(value) 
+    x
+})
+
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Methods - evaluation
 ###
 
-setMethod(bpmapply, c("ANY", "SerialParam"),
-    function(FUN, ..., MoreArgs=NULL, SIMPLIFY=TRUE, USE.NAMES=TRUE,
-             BPRESUME=getOption("BiocParallel.BPRESUME", FALSE), 
-             BPPARAM=bpparam())
-{
-    FUN <- match.fun(FUN)
-    mapply(FUN, ..., MoreArgs=MoreArgs, SIMPLIFY=SIMPLIFY, USE.NAMES=USE.NAMES)
-})
-
 setMethod(bplapply, c("ANY", "SerialParam"),
-    function(X, FUN, ..., BPRESUME=getOption("BiocParallel.BPRESUME", FALSE),
-             BPPARAM=bpparam())
+    function(X, FUN, ..., BPREDO=list(), BPPARAM=bpparam())
 {
+    if (!length(X))
+        return(list())
     FUN <- match.fun(FUN)
-    lapply(X, FUN, ...)
+    if (length(BPREDO)) {
+        if (all(idx <- !bpok(BPREDO)))
+            stop("no error detected in 'BPREDO'")
+        if (length(BPREDO) != length(X))
+            stop("length(BPREDO) must equal length(X)")
+        message("Resuming previous calculation ... ")
+        X <- X[idx]
+    }
+
+    if (bplog(BPPARAM) || bpstopOnError(BPPARAM))
+        FUN <- .composeTry(FUN, TRUE)
+    else
+        FUN <- .composeTry(FUN, FALSE)
+
+    res <- lapply(X, FUN, ...)
+    if (length(BPREDO)) {
+        BPREDO[idx] <- res
+        BPREDO 
+    } else res
 })
 
 .bpiterate_serial <- function(ITER, FUN, ..., REDUCE, init)
@@ -82,5 +144,12 @@ setMethod(bplapply, c("ANY", "SerialParam"),
 setMethod(bpiterate, c("ANY", "ANY", "SerialParam"),
     function(ITER, FUN, ..., BPPARAM=bpparam())
 {
+    ITER <- match.fun(ITER)
+    FUN <- match.fun(FUN)
+    if (bplog(BPPARAM) || bpstopOnError(BPPARAM))
+        FUN <- .composeTry(FUN, TRUE)
+    else
+        FUN <- .composeTry(FUN, FALSE)
+
     .bpiterate_serial(ITER, FUN, ...)
 })

@@ -14,26 +14,38 @@ quiet <- suppressWarnings
 
 test_bpiterate_Params <- function()
 {
-    params1 <- list(serial=SerialParam(),
-                   mc=MulticoreParam(2),
-                   snow1=SnowParam(2, "SOCK"),
-                   snow2=SnowParam(2, "MPI"))
-    params2 <- list(dopar=DoparParam(), 
-                   batchjobs=BatchJobsParam())
-
+    ## chunks greater than no. workers
     x <- 1:5
     expected <- lapply(x, sqrt)
     FUN <- function(count, ...) sqrt(count)
-    for (ptype in names(params1)) {
+
+    params <- list(serial=SerialParam(),
+                   multi=MulticoreParam(2),
+                   snow=SnowParam(2))
+    for (p in params) {
         ITER <- .lazyCount(length(x))
-        quiet(res <- bpiterate(ITER, FUN, BPPARAM=params1[[ptype]]))
+        quiet(res <- bpiterate(ITER, FUN, BPPARAM=p))
         checkIdentical(expected, res)
     }
 
-    for (ptype in names(params2)) {
+    ## chunks less than no. workers
+    x <- 1:2
+    expected <- lapply(x, sqrt)
+    FUN <- function(count, ...) sqrt(count)
+    params <- list(serial=SerialParam(),
+                   multi=MulticoreParam(4),
+                   snow=SnowParam(4))
+
+    for (p in params) {
         ITER <- .lazyCount(length(x))
-        checkException(bpiterate(ITER, FUN, BPPARAM=params2[[ptype]]), 
-                       silent=TRUE)
+        quiet(res <- bpiterate(ITER, FUN, BPPARAM=p))
+        checkIdentical(expected, res)
+    }
+
+    params <- list(dopar=DoparParam(), batchjobs=BatchJobsParam())
+    for (p in params) {
+        ITER <- .lazyCount(length(x))
+        checkException(bpiterate(ITER, FUN, BPPARAM=p), silent=TRUE)
     }
 
     closeAllConnections()
@@ -42,49 +54,54 @@ test_bpiterate_Params <- function()
 
 test_bpiterate_REDUCE <- function() {
 
-    workers <- 3
-    param <- MulticoreParam(workers)
+    ncount <- 3L
+    params <- list(snow=SnowParam(ncount))
+    ## On Windows MulticoreParam dispatches to SerialParam where
+    ## 'reduce.in.order' does not apply (always TRUE)
+    if (.Platform$OS.type != "windows") 
+        params <- c(params, multi=MulticoreParam(ncount))
 
-    ## no REDUCE
-    FUN <- function(count, ...) rep(count, 10)
-    ITER <- .lazyCount(workers)
-    res <- bpiterate(ITER, FUN, BPPARAM=param)
-    checkTrue(length(res) == 3L)
-    expected <- list(rep(1L, 10), rep(2L, 10), rep(3L, 10))
-    checkIdentical(expected, res)
-
-    ## reduce.in.order=FALSE
-    if (.Platform$OS.type != "windows") {
+    for (p in params) {
+        ## no REDUCE
         FUN <- function(count, ...) rep(count, 10)
-        ITER <- .lazyCount(workers)
-        res <- bpiterate(ITER, FUN, BPPARAM=param, REDUCE=`+`)
+        ITER <- .lazyCount(ncount)
+        res <- bpiterate(ITER, FUN, BPPARAM=p)
+        checkTrue(length(res) == ncount)
+        expected <- list(rep(1L, 10), rep(2L, 10), rep(3L, 10))
+        checkIdentical(expected, res)
+
+        ## REDUCE
+        FUN <- function(count, ...) rep(count, 10)
+        ITER <- .lazyCount(ncount)
+        res <- bpiterate(ITER, FUN, BPPARAM=p, REDUCE=`+`)
         checkTrue(length(res) == 1L)
         expected <- list(rep(6L, 10))
         checkIdentical(expected, res)
 
-        ## reduce.in.order=TRUE
         FUN <- function(count, ...) {
-            Sys.sleep(workers - count)
+            Sys.sleep(3 - count)
             count
         }
-        ITER <- .lazyCount(workers)
-        res <- bpiterate(ITER, FUN, BPPARAM=param, REDUCE=paste0, 
+        ## 'reduce.in.order' FALSE
+        ITER <- .lazyCount(ncount)
+        res <- bpiterate(ITER, FUN, BPPARAM=p, REDUCE=paste0, 
                          reduce.in.order=FALSE)
         checkIdentical(unlist(res, use.names=FALSE), "321")
 
-        ITER <- .lazyCount(workers)
-        res <- bpiterate(ITER, FUN, BPPARAM=param, REDUCE=paste0, 
+        ITER <- .lazyCount(ncount)
+        res <- quiet(bpiterate(ITER, FUN, BPPARAM=p, REDUCE=paste0, init=0, 
+                               reduce.in.order=FALSE))
+        checkIdentical(unlist(res, use.names=FALSE), "0321")
+
+        ## 'reduce.in.order' TRUE 
+        ITER <- .lazyCount(ncount)
+        res <- bpiterate(ITER, FUN, BPPARAM=p, REDUCE=paste0, 
                          reduce.in.order=TRUE)
         checkIdentical(unlist(res, use.names=FALSE), "123")
 
-        ITER <- .lazyCount(workers)
-        res <- bpiterate(ITER, FUN, BPPARAM=param, REDUCE=paste0, 
+        ITER <- .lazyCount(ncount)
+        res <- bpiterate(ITER, FUN, BPPARAM=p, REDUCE=paste0, 
                          init=0, reduce.in.order=TRUE)
-        checkIdentical(unlist(res, use.names=FALSE), "0123")
-
-        ITER <- .lazyCount(workers)
-        res <- quiet(bpiterate(ITER, FUN, BPPARAM=param, 
-            REDUCE=paste0, init=0, reduce.in.order=FALSE))
         checkIdentical(unlist(res, use.names=FALSE), "0123")
     }
 

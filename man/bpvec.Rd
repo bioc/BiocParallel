@@ -1,8 +1,8 @@
 \name{bpvec}
 \alias{bpvec}
-\alias{bpvec,ANY,ANY-method}
-\alias{bpvec,ANY,BiocParallelParam-method}
 \alias{bpvec,ANY,missing-method}
+\alias{bpvec,ANY,MulticoreParam-method}
+\alias{bpvec,ANY,BiocParallelParam-method}
 
 \title{Parallel, vectorized evaluation}
 
@@ -16,13 +16,13 @@
 }
 
 \usage{
-bpvec(X, FUN, ..., AGGREGATE=c, BPPARAM=bpparam())
+bpvec(X, FUN, ..., AGGREGATE=c, BPREDO=list(), BPPARAM=bpparam())
 
-\S4method{bpvec}{ANY,ANY}(X, FUN, ..., AGGREGATE=c, BPPARAM=bpparam())
+\S4method{bpvec}{ANY,BiocParallelParam}(X, FUN, ..., AGGREGATE=c, 
+    BPREDO=list(), BPPARAM=bpparam())
 
-\S4method{bpvec}{ANY,BiocParallelParam}(X, FUN, ..., AGGREGATE=c, BPPARAM=bpparam())
-
-\S4method{bpvec}{ANY,missing}(X, FUN, ..., AGGREGATE=c, BPPARAM=bpparam())
+\S4method{bpvec}{ANY,missing}(X, FUN, ..., AGGREGATE=c, 
+    BPREDO=list(), BPPARAM=bpparam())
 }
 
 \arguments{
@@ -30,19 +30,24 @@ bpvec(X, FUN, ..., AGGREGATE=c, BPPARAM=bpparam())
     Any object for which methods \code{length}, \code{[}, and \code{c}
     are implemented.
   }
-
-  \item{FUN}{The \code{function} to be applied to subsets of \code{X}.}
-
-  \item{\dots}{Additional arguments for \code{FUN}.}
-
+  \item{FUN}{The \code{function} to be applied to subsets of \code{X}.
+  }
+  \item{\dots}{Additional arguments for \code{FUN}.
+  }
   \item{AGGREGATE}{A function taking any number of arguments \code{...}
     called to reduce results (elements of the \code{...} argument of
     \code{AGGREGATE} from parallel jobs. The default, \code{c},
     concatenates objects and is appropriate for vectors; \code{rbind}
-    might be appropriate for data frames.}
-
+    might be appropriate for data frames.
+  }
   \item{BPPARAM}{A optional \code{\link{BiocParallelParam}} instance
-    determining the parallel back-end to be used during evaluation.}
+    determining the parallel back-end to be used during evaluation.
+  }
+  \item{BPREDO}{A \code{list} of output from \code{bpvec} with one or
+    more failed elements. When a list is given in \code{BPREDO},
+    \code{bpok} is used to identify errors, tasks are rerun and inserted
+    into the original results.
+  }
 
 }
 

@@ -1,41 +1,26 @@
-library(doParallel)                     # FIXME: unload?
-
-.fork_not_windows <- function(expected, expr)
-{
-    err <- NULL
-    obs <- tryCatch(expr, error=function(e) {
-        if (!all(grepl("fork clusters are not supported on Windows",
-                       conditionMessage(e))))
-            err <<- conditionMessage(e)
-        expected
-    })
-    if (!is.null(err))
-      print(as.character(err))
-    checkTrue(is.null(err))
-    checkIdentical(expected, obs)
-}
+library(doParallel)  ## FIXME: unload?
+quiet <- suppressWarnings
 
 test_bplapply_Params <- function()
 {
+    registerDoParallel(2)
     params <- list(serial=SerialParam(),
+                   snow=SnowParam(2),
                    mc=MulticoreParam(2),
-                   snow=SnowParam(2, "SOCK"),
                    dopar=DoparParam(),
                    batchjobs=BatchJobsParam())
-    dop <- registerDoParallel(cores=2)
 
     x <- 1:10
     expected <- lapply(x, sqrt)
-    for (ptype in names(params)) {
-        .fork_not_windows(expected,
-                          bplapply(x, sqrt, BPPARAM=params[[ptype]]))
+    for (param in names(params)) {
+        current <- quiet(bplapply(x, sqrt, BPPARAM=params[[param]]))
+        checkIdentical(expected, current)
     }
 
-
     # test empty input
-    for (ptype in names(params)) {
-      .fork_not_windows(list(),
-        bplapply(list(), identity, BPPARAM=params[[ptype]]))
+    for (param in names(params)) {
+        current <- quiet(bplapply(list(), identity, BPPARAM=params[[param]]))
+        checkIdentical(list(), current)
     }
 
     closeAllConnections()
@@ -44,18 +29,19 @@ test_bplapply_Params <- function()
 
 test_bplapply_symbols <- function()
 {
+    registerDoParallel(2)
     params <- list(serial=SerialParam(),
-                   mc=MulticoreParam(2),
-                   snow=SnowParam(2, "SOCK"),
-                   dopar=DoparParam(),
-                   batchjobs=BatchJobsParam())
-    dop <- registerDoParallel(cores=2)
+                   snow=SnowParam(2),
+                   dopar=DoparParam())
+                  # batchjobs=BatchJobsParam()) ## FIXME
+    if (.Platform$OS.type != "windows")
+        params$mc <- MulticoreParam(2)
 
-    X <- list(as.symbol(".XYZ"))
-    expected <- lapply(X, as.character)
-    for (ptype in names(params)) {
-        .fork_not_windows(expected,
-                          bplapply(X, as.character, BPPARAM=params[[ptype]]))
+    x <- list(as.symbol(".XYZ"))
+    expected <- lapply(x, as.character)
+    for (param in names(params)) {
+        current <- quiet(bplapply(x, as.character, BPPARAM=params[[param]]))
+        checkIdentical(expected, current)
     }
 
     closeAllConnections()

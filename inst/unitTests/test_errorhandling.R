@@ -1,50 +1,71 @@
-checkExceptionText <-
-    function(expr, txt, negate=FALSE, msg="")
+## NOTE: On Windows, MulticoreParam() throws a warning and instantiates
+##       a single FORK worker using scripts from parallel. No logging or 
+##       error catching is implemented.
+
+library(doParallel)
+
+checkExceptionText <- function(expr, txt, negate=FALSE, msg="")
 {
     x <- try(eval(expr), silent=TRUE)
-    checkTrue(inherits(x, "try-error"), msg=msg)
+    checkTrue(inherits(x, "condition"), msg=msg)
     checkTrue(xor(negate, grepl(txt, as.character(x), fixed=TRUE)), msg=msg)
 }
 
-test_errorhandling <-
-    function()
+test_catching_errors <- function()
 {
-    # FIXME we need the windows workaround
-    library(doParallel)
-    registerDoParallel()
-
     x <- 1:10
     y <- rev(x)
     f <- function(x, y) if (x > y) stop("whooops") else x + y
 
+    registerDoParallel(2)
     params <- list(
-        batchjobs=BatchJobsParam(catch.errors=FALSE, progressbar=FALSE),
-        dopar=DoparParam(catch.errors=FALSE))
+        serial=SerialParam(),
+        snow=SnowParam(2),
+        dopar=DoparParam(),
+        batchjobs=BatchJobsParam(progressbar=FALSE))
+    if (.Platform$OS.type != "windows")
+        params$mc <- MulticoreParam(2)
 
     for (param in params) {
-        checkExceptionText(bpmapply(f, x, y, BPPARAM=param),
-            "Error in FUN(...): whooops", negate=TRUE)
+        res <- bplapply(list(1, "2", 3), sqrt, BPPARAM=param)
+        checkTrue(length(res) == 3L)
+        msg <- "non-numeric argument to mathematical function"
+        checkIdentical(conditionMessage(res[[2]]), msg)
     }
 
-    # check that resume works
-    x <- 1:10
-    y <- rev(x)
-    f <- function(x, y) if (x > y) stop("whooops") else x + y
-    f.fix <- function(x, y) 0
+    closeAllConnections()
+    TRUE
+}
 
-   params <- list(
-        batchjobs=BatchJobsParam(catch.errors=TRUE, progressbar=FALSE),
-        dopar=DoparParam(catch.errors=TRUE))
+test_BPREDO <- function()
+{
+    f = sqrt
+    x = list(1, "2", 3) 
+    x.fix = list(1, 2, 3) 
+
+    registerDoParallel(2)
+    params <- list(
+        serial=SerialParam(),
+        snow=SnowParam(2),
+        dopar=DoparParam(),
+        batchjobs=BatchJobsParam(progressbar=FALSE))
+    if (.Platform$OS.type != "windows")
+        params$mc <- MulticoreParam(2)
 
     for (param in params) {
-        ok <- try(bpmapply(f, x, y, BPPARAM=param), silent=TRUE)
-        checkTrue(inherits(ok, "try-error"))
+        res <- bpmapply(f, x, BPPARAM=param, SIMPLIFY=TRUE)
+        checkTrue(inherits(res[[2]], "condition"))
+        Sys.sleep(0.25)
 
-        ok <- try(bpresume(bpmapply(f, x, y, BPPARAM=param)), silent=TRUE)
-        checkTrue(inherits(ok, "try-error"))
+        ## data not fixed
+        res2 <- bpmapply(f, x, BPPARAM=param, BPREDO=res, SIMPLIFY=TRUE)
+        checkTrue(inherits(res2[[2]], "condition"))
+        Sys.sleep(0.25)
 
-        res <- bpresume(bpmapply(f.fix, x, y, BPPARAM=param))
-        checkIdentical(as.integer(res), c(rep(11L, 5), rep(0L, 5)))
+        ## data fixed
+        res3 <- bpmapply(f, x.fix, BPPARAM=param, BPREDO=res, SIMPLIFY=TRUE)
+        checkIdentical(res3, sqrt(1:3))
+        Sys.sleep(0.25)
     }
 
     closeAllConnections()

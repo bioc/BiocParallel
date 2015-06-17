@@ -8,24 +8,22 @@
         workers="ANY",
         tasks="integer",
         catch.errors="logical",
-        stop.on.error="logical"),
+        stop.on.error="logical",
+        progressbar="logical"),
     methods=list(
         initialize = function(..., 
             workers=0, 
             tasks=0L, 
             catch.errors=TRUE,
-            stop.on.error=FALSE)
+            stop.on.error=FALSE,
+            progressbar=FALSE)
         {
-            initFields(workers=workers, tasks=tasks,
-                       catch.errors=catch.errors, stop.on.error=stop.on.error)
+            initFields(workers=workers, tasks=tasks, catch.errors=catch.errors, 
+                       stop.on.error=stop.on.error, progressbar=progressbar)
             callSuper(...)
         },
         show = function() {
             cat("class:", class(.self), "\n")
-            cat("bpworkers:", bpworkers(.self), "\n")
-            cat("bptasks:", bptasks(.self), "\n")
-            cat("bpcatchErrors:", bpcatchErrors(.self), "\n")
-            cat("bpstopOnError:", bpstopOnError(.self), "\n")
         })
 )
 
@@ -61,9 +59,6 @@ setValidity("BiocParallelParam", function(object)
         msg <- c(msg, "'catch.errors' must be TRUE or FALSE")
     if (!.isTRUEorFALSE(bpstopOnError(object)))
         msg <- c(msg, "'bpstopOnError(BPPARAM)' must be logical(1)")
-    if (bpstopOnError(object) && !bpcatchErrors(object))
-        msg <- c(msg, paste0("'catch.errors' must be TRUE when ",
-                 " 'stop.on.error' is TRUE"))
 
     if (is.null(msg)) TRUE else msg
 })
@@ -118,7 +113,19 @@ setReplaceMethod("bpcatchErrors", c("BiocParallelParam", "logical"),
     x 
 })
 
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+setMethod("bpprogressbar", "BiocParallelParam",
+    function(x, ...)
+{
+    x$progressbar
+})
+
+setReplaceMethod("bpprogressbar", c("BiocParallelParam", "logical"),
+    function(x, ..., value)
+{
+    x$progressbar <- value 
+    x
+})
+
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Helpers
 ###
@@ -129,8 +136,13 @@ setReplaceMethod("bpcatchErrors", c("BiocParallelParam", "logical"),
 }
 
 bpok <- function(x) {
-    if (!is(x, "list"))
+    if (is.null(x))
+        x
+    else if (!is.list(x))
         stop("'x' must be a list")
-
-    lapply(x, function(elt) !is(elt, "try-error"))
+    else
+        sapply(x, function(elt) !is(elt, "condition"))
 }
+
+
+

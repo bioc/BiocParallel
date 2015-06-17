@@ -1,11 +1,10 @@
 setGeneric("bplapply", signature=c("X", "BPPARAM"),
-    function(X, FUN, ..., BPRESUME=getOption("BiocParallel.BPRESUME", FALSE),
-        BPPARAM=bpparam())
+    function(X, FUN, ..., BPREDO=list(), BPPARAM=bpparam())
     standardGeneric("bplapply"))
 
 setGeneric("bpmapply", signature=c("FUN", "BPPARAM"),
     function(FUN, ..., MoreArgs=NULL, SIMPLIFY=TRUE, USE.NAMES=TRUE,
-        BPRESUME=getOption("BiocParallel.BPRESUME", FALSE), BPPARAM=bpparam())
+             BPREDO=list(), BPPARAM=bpparam())
     standardGeneric("bpmapply"))
 
 setGeneric("bpiterate", signature=c("ITER", "FUN", "BPPARAM"),
@@ -13,19 +12,22 @@ setGeneric("bpiterate", signature=c("ITER", "FUN", "BPPARAM"),
     standardGeneric("bpiterate"))
 
 setGeneric("bpvec", signature=c("X", "BPPARAM"),
-    function(X, FUN, ..., AGGREGATE=c, BPPARAM=bpparam())
+    function(X, FUN, ..., AGGREGATE=c, BPREDO=list(), BPPARAM=bpparam())
     standardGeneric("bpvec"))
 
 setGeneric("bpvectorize",
-    function(FUN, ..., BPPARAM=bpparam())
+    function(FUN, ..., BPREDO=list(), BPPARAM=bpparam())
     standardGeneric("bpvectorize"))
 
-setGeneric("bpaggregate",
-    function(x, ..., BPPARAM=bpparam())
+setGeneric("bpaggregate", signature=c("x", "BPPARAM"),
+    function(x, ..., BPREDO=list(), BPPARAM=bpparam())
     standardGeneric("bpaggregate"))
 
 setGeneric("bpworkers",
     function(x, ...) standardGeneric("bpworkers"))
+
+setGeneric("bpworkers<-",
+    function(x, ..., value) standardGeneric("bpworkers<-"))
 
 setGeneric("bptasks",
     function(x, ...) standardGeneric("bptasks"))
@@ -46,7 +48,18 @@ setGeneric("bpstopOnError",
 setGeneric("bpstopOnError<-",
     function(x, ..., value) standardGeneric("bpstopOnError<-"))
 
-## logging
+setGeneric("bpprogressbar",
+    function(x, ...) standardGeneric("bpprogressbar"))
+
+setGeneric("bpprogressbar<-",
+    function(x, ..., value) standardGeneric("bpprogressbar<-"))
+
+setGeneric("bpRNGseed",
+    function(x, ...) standardGeneric("bpRNGseed"))
+
+setGeneric("bpRNGseed<-",
+    function(x, ..., value) standardGeneric("bpRNGseed<-"))
+
 setGeneric("bplog",
     function(x, ...) standardGeneric("bplog"))
 

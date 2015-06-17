@@ -16,38 +16,28 @@ multicoreWorkers <- function() {
 
 .MulticoreParam <- setRefClass("MulticoreParam",
     contains="SnowParam",
-    fields=list(
-        setSeed="logical",
-        recursive="logical",
-        cleanup="logical",
-        cleanupSignal="integer",
-        verbose="logical"),
+    fields=list(),
     methods=list(
-      initialize = function(..., 
-          setSeed=TRUE,
-          recursive=TRUE,
-          cleanup=TRUE,
-          cleanupSignal=tools::SIGTERM,
-          verbose=FALSE)
-      { 
-          initFields(setSeed=setSeed, recursive=recursive, cleanup=cleanup, 
-                     cleanupSignal=cleanupSignal, verbose=verbose)
-          callSuper(...)
-      })
+        show = function() {
+            callSuper()
+        })
 )
 
 MulticoreParam <- function(workers=multicoreWorkers(), 
         tasks=0L, catch.errors=TRUE, stop.on.error=FALSE, 
-        log=FALSE, threshold="INFO", logdir=character(),
-        resultdir=character(), setSeed=TRUE,
-        recursive=TRUE, cleanup=TRUE, cleanupSignal=tools::SIGTERM,
-        verbose=FALSE, ...)
+        progressbar=FALSE, RNGseed=NULL, log=FALSE, 
+        threshold="INFO", logdir=NA_character_,
+        resultdir=NA_character_, ...)
 {
-    .MulticoreParam(setSeed=setSeed, recursive=recursive, cleanup=cleanup,
-        cleanupSignal=cleanupSignal, verbose=verbose,
-        workers=as.integer(workers), tasks=as.integer(tasks),
-        catch.errors=catch.errors, stop.on.error=stop.on.error, 
-        log=log, threshold=threshold, logdir=logdir, resultdir=resultdir,
+    if (.Platform$OS.type == "windows")
+        warning(paste0("MulticoreParam not supported on Windows. ",
+                       "Use SnowParam instead."))
+
+    .MulticoreParam(workers=as.integer(workers), 
+        tasks=as.integer(tasks), catch.errors=catch.errors, 
+        stop.on.error=stop.on.error, progressbar=progressbar, 
+        RNGseed=RNGseed, log=log, threshold=.THRESHOLD(threshold), 
+        logdir=logdir, resultdir=resultdir,
         .clusterargs=list(spec=as.integer(workers), type="FORK"), ...)
 }
 
@@ -77,10 +67,22 @@ setValidity("MulticoreParam",
 ### Methods - control
 ###
 
+setReplaceMethod("bpworkers", c("MulticoreParam", "numeric"),
+    function(x, ..., value)
+{
+    if (value > multicoreWorkers())
+        stop("'value' exceeds available workers detected by multicoreWorkers()")
+    x$tasks <- as.integer(value)
+    x 
+})
+
 setMethod(bpschedule, "MulticoreParam",
     function(x, ...)
 {
-    (.Platform$OS.type != "windows") && (x$recursive || !isChild())
+    if (.Platform$OS.type == "windows") 
+        FALSE
+    else
+        TRUE
 })
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -88,35 +90,31 @@ setMethod(bpschedule, "MulticoreParam",
 ###
 
 setMethod(bpvec, c("ANY", "MulticoreParam"),
-    function(X, FUN, ..., AGGREGATE=c, BPPARAM=bpparam())
+    function(X, FUN, ..., AGGREGATE=c, BPREDO=list(), BPPARAM=bpparam())
 {
     FUN <- match.fun(FUN)
     AGGREGATE <- match.fun(AGGREGATE)
 
+    if (!length(X))
+        return(list())
     if (!bpschedule(BPPARAM))
-        return(FUN(X, ...))
-
-    pvec(X, FUN, ..., AGGREGATE=AGGREGATE,
-         mc.set.seed=BPPARAM$setSeed,
-         mc.silent=!BPPARAM$verbose, mc.cores=bpworkers(BPPARAM),
-         mc.cleanup=if (BPPARAM$cleanup) BPPARAM$cleanupSignal else FALSE)
-})
-
-setMethod(bpiterate, c("ANY", "ANY", "MulticoreParam"),
-    function(ITER, FUN, ..., BPPARAM=bpparam())
-{
-    ITER <- match.fun(ITER)
-    FUN <- match.fun(FUN)
-
-    if (.Platform$OS.type == "windows")
-        results <- .bpiterate_serial(ITER, FUN, ...)
+        return(bpvec(X, FUN, ..., AGGREGATE=AGGREGATE, BPREDO=BPREDO,
+               BPPARAM=SerialParam()))
+    if (bplog(BPPARAM) || bpstopOnError(BPPARAM))
+        FUN <- .composeTry(FUN, TRUE)
     else
-        results <- .bpiterate_multicore(ITER, FUN, ...,
-            mc.set.seed=BPPARAM$setSeed, mc.silent=!BPPARAM$verbose,
-            mc.cores=bpworkers(BPPARAM), 
-            mc.cleanup=if (BPPARAM$cleanup) BPPARAM$cleanupSignal else FALSE)
+        FUN <- .composeTry(FUN, FALSE)
 
-    results
-
+    if (length(BPREDO)) {
+        if (all(idx <- !bpok(BPREDO)))
+            stop("no error detected in 'BPREDO'")
+        if (length(BPREDO) != length(X))
+            stop("length(BPREDO) must equal length(X)")
+        message("Resuming previous calculation ... ")
+        res <- pvec(X[idx], FUN, ..., AGGREGATE=AGGREGATE, 
+                   mc.cores=bpworkers(BPPARAM))
+        BPREDO[id] <- res
+        BPREDO
+    }
+    pvec(X, FUN, ..., AGGREGATE=AGGREGATE, mc.cores=bpworkers(BPPARAM))
 })
-

@@ -6,6 +6,10 @@
 
 \alias{bpisup,SerialParam-method}
 \alias{bpworkers,SerialParam-method}
+\alias{bplog,SerialParam-method}
+\alias{bpthreshold,SerialParam-method}
+\alias{bplog<-,SerialParam,logical-method}
+\alias{bpthreshold<-,SerialParam,character-method}
 
 \title{Enable serial evaluation}
 
@@ -17,16 +21,41 @@
 }
 
 \usage{
-SerialParam() 
+SerialParam(catch.errors = TRUE, stop.on.error = FALSE,
+            log = FALSE, threshold = "INFO") 
 }
 
-\section{SerialParam constructor}{
+\section{Constructor}{
 
-  Return an object to be used for serial evaluation of otherwise
-  parallel functions such as \code{\link{bplapply}},
-  \code{\link{bpvec}}.
+  \describe{
+    \item{}{
+      \code{SerialParam(catch.errors = TRUE, stop.on.error = FALSE,
+                        log = FALSE, threshold = "INFO")}:
+
+       Return an object to be used for serial evaluation of otherwise
+       parallel functions such as \code{\link{bplapply}},
+       \code{\link{bpvec}}.
+    }
+  }
+
 }
 
+\arguments{
+
+  \item{catch.errors}{
+    \code{logical(1)} Enable the catching of errors and warnings.
+  }
+  \item{stop.on.error}{
+    \code{logical(1)} Enable stop on error.
+  }
+  \item{log}{
+    \code{logical(1)} Enable logging.
+  }
+  \item{threshold}{
+    \code{character(1)} Logging threshold as defined in \code{futile.logger}.
+  }
+
+}
 
 \section{Methods}{
 

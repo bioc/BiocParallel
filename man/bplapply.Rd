@@ -1,14 +1,12 @@
 \name{bplapply}
 \alias{bplapply}
-\alias{bplapply,ANY,ANY-method}
+\alias{bplapply,ANY,list-method}
 \alias{bplapply,ANY,missing-method}
 \alias{bplapply,ANY,BiocParallelParam-method}
 \alias{bplapply,ANY,BatchJobsParam-method}
 \alias{bplapply,ANY,DoparParam-method}
-\alias{bplapply,ANY,MulticoreParam-method}
 \alias{bplapply,ANY,SerialParam-method}
 \alias{bplapply,ANY,SnowParam-method}
-\alias{bplapply,ANY,list-method}
 
 \title{Parallel lapply-like functionality}
 
@@ -23,21 +21,13 @@
 
 \usage{
 
-bplapply(X, FUN, ..., 
-         BPRESUME = getOption("BiocParallel.BPRESUME", FALSE),
-         BPPARAM=bpparam())
+bplapply(X, FUN, ..., BPREDO = list(), BPPARAM=bpparam())
 
-\S4method{bplapply}{ANY,ANY}(X, FUN, ...,
-         BPRESUME = getOption("BiocParallel.BPRESUME", FALSE),
-         BPPARAM=bpparam())
-
-\S4method{bplapply}{ANY,missing}(X, FUN, ...,
-         BPRESUME = getOption("BiocParallel.BPRESUME", FALSE),
-         BPPARAM=bpparam())
+\S4method{bplapply}{ANY,missing}(X, FUN, ..., 
+    BPREDO = list(), BPPARAM=bpparam())
 
 \S4method{bplapply}{ANY,BiocParallelParam}(X, FUN, ...,
-         BPRESUME = getOption("BiocParallel.BPRESUME", FALSE),
-         BPPARAM=bpparam())
+    BPREDO = list(), BPPARAM=bpparam())
 
 }
 
@@ -53,16 +43,16 @@ bplapply(X, FUN, ...,
   \item{\dots}{
     Additional arguments for \code{FUN}, as in \code{\link{lapply}}.
   }
-  \item{BPRESUME}{
-    Flag to determine if a previous partially successful run
-    should be resumed.  See \code{\link{bpresume}} for details.
-    Supported for \code{BatchJobsParam} and \code{DoparParam} only.
-  }
   \item{BPPARAM}{
     An optional \code{\link{BiocParallelParam}} instance
     determining the parallel back-end to be used during evaluation, or a
     \code{list} of \code{BiocParallelParam} instances, to be applied in
     sequence for nested calls to \code{bplapply}.
+  }
+  \item{BPREDO}{A \code{list} of output from \code{bplapply} with one or
+    more failed elements. When a list is given in \code{BPREDO},
+    \code{bpok} is used to identify errors, tasks are rerun and inserted
+    into the original results.
   }
 
 }
