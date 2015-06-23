@@ -63,7 +63,7 @@ setOldClass(c("NULLcluster", "cluster"))
                    "; bpisup:", bpisup(.self), "\n", sep="")
             cat("  bplog:", bplog(.self),
                    "; bpthreshold:", names(bpthreshold(.self)),
-                   "; bplogdir:", bplogdir(.self))
+                   "; bplogdir:", bplogdir(.self), "\n", sep="")
             cat("  bpstopOnError:", bpstopOnError(.self),
                    "; bpprogressbar:", bpprogressbar(.self), "\n", sep="")
             cat("  bpresultdir:", bpresultdir(.self), "\n", sep="")
