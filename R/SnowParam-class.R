@@ -190,24 +190,33 @@ setMethod(bpstart, "SnowParam",
         cargs$spec <- min(bpworkers(x), lenX)
     } else stop("cluster not started; no workers specified")
 
-    ## initialize worker script in BiocParallel
-    if (x$.clusterargs$type == "FORK") {
-        bpbackend(x) <- do.call(.bpmakeForkCluster, 
-                          c(list(nnodes=cargs$spec), cargs))
+
+    check <- (bplog(x) || bpstopOnError(x) || bpprogressbar(x) || 
+              !is.na(bpresultdir(x)))
+    ## script in BiocParallel
+    if (check) {
+        if (x$.clusterargs$type == "FORK") {
+            bpbackend(x) <- do.call(.bpmakeForkCluster, 
+                              c(list(nnodes=cargs$spec), cargs))
+        } else {
+            cargs$useRscript <- FALSE
+            cargs$scriptdir <- find.package("BiocParallel")
+            bpbackend(x) <- do.call(makeCluster, cargs)
+        }
+        if (bplog(x))
+            .initiateLogging(x)
+        if (!is.null(bpRNGseed(x))) {
+            tryCatch({
+                clusterSetRNGStream(bpbackend(x), bpRNGseed(x))
+            }, error = function(err) {
+                   bpstop(x)
+                   stop(conditionMessage(err), ": problem setting RNG stream") 
+            })
+        }
     } else {
-        cargs$useRscript <- FALSE
-        cargs$scriptdir <- find.package("BiocParallel")
-        bpbackend(x) <- do.call(makeCluster, cargs)
-    }
-    if (bplog(x))
-        .initiateLogging(x)
-    if (!is.null(bpRNGseed(x))) {
-        tryCatch({
-            clusterSetRNGStream(bpbackend(x), bpRNGseed(x))
-        }, error = function(err) {
-               bpstop(x)
-               stop(conditionMessage(err), ": problem setting RNG stream") 
-        })
+        ## script in parallel
+        x$.clusterargs$useRscript <- TRUE 
+        bpbackend(x) <- do.call(makeCluster, x$.clusterargs)
     }
     invisible(x)
 })
@@ -295,7 +304,8 @@ setMethod(bplapply, c("ANY", "SnowParam"),
 
     ## split into tasks 
     X <- .splitX(X, bpworkers(BPPARAM), bptasks(BPPARAM))
-    ## start cluster
+
+    ## start / stop cluster
     if (!bpisup(BPPARAM)) {
         BPPARAM <- bpstart(BPPARAM, length(X))
         on.exit(bpstop(BPPARAM), TRUE)
@@ -307,12 +317,19 @@ setMethod(bplapply, c("ANY", "SnowParam"),
     on.exit(progress$term(), TRUE)
 
     argfun <- function(i) c(list(X[[i]]), list(FUN=FUN), list(...))
-    if (bplog(BPPARAM) || bpstopOnError(BPPARAM) || bpprogressbar(BPPARAM))
+
+    check <- (bplog(BPPARAM) || bpstopOnError(BPPARAM) || 
+              bpprogressbar(BPPARAM) ||
+              !is.na(bpresultdir(BPPARAM)))
+    if (check) {
+        ## script in BiocParallel
         res <- bpdynamicClusterApply(bpbackend(BPPARAM), lapply, 
                                      length(X), argfun, BPPARAM, progress)
-    else
+    } else {
+        ## script in parallel
         res <- parallel:::dynamicClusterApply(bpbackend(BPPARAM), lapply, 
                                               length(X), argfun)
+    }
     if (!is.null(res)) {
         res <- do.call(unlist, list(res, recursive=FALSE))
         names(res) <- nms
