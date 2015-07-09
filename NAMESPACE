@@ -40,11 +40,12 @@ export(
     bplapply, bpvec, bpvectorize, bpmapply, bpaggregate, bpiterate,
 
     ## bp-controls
-    bpworkers, "bpworkers<-", bpbackend, "bpbackend<-", bptasks, "bptasks<-",
+    bpworkers, "bpworkers<-", bpbackend, "bpbackend<-", 
+    bptasks, "bptasks<-", bpjobname, "bpjobname<-",
     bpstart, bpstop, bpisup, 
     bpcatchErrors, "bpcatchErrors<-", bpstopOnError, "bpstopOnError<-", 
     bpprogressbar, "bpprogressbar<-", bpRNGseed, "bpRNGseed<-",
-    bplog, "bplog<-", bplogdir, "bplogdir<-",
+    bptimeout, "bptimeout<-", bplog, "bplog<-", bplogdir, "bplogdir<-",
     bpthreshold, "bpthreshold<-", bpresultdir, "bpresultdir<-",
 
     ## schedule
@@ -56,11 +57,12 @@ exportMethods(
     bplapply, bpvec, bpvectorize, bpmapply, bpaggregate, bpiterate,
 
     ## bp-controls
-    bpworkers, "bpworkers<-", bpbackend, "bpbackend<-", bptasks, "bptasks<-",
+    bpworkers, "bpworkers<-", bpbackend, "bpbackend<-", 
+    bptasks, "bptasks<-", bpjobname, "bpjobname<-",
     bpstart, bpstop, bpisup, 
     bpcatchErrors, "bpcatchErrors<-", bpstopOnError, "bpstopOnError<-", 
     bpprogressbar, "bpprogressbar<-", bpRNGseed, "bpRNGseed<-",
-    bplog, "bplog<-", bplogdir, "bplogdir<-",
+    bptimeout, "bptimeout<-", bplog, "bplog<-", bplogdir, "bplogdir<-",
     bpthreshold, "bpthreshold<-", bpresultdir, "bpresultdir<-",
 
     ## schedule
