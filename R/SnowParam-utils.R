@@ -25,18 +25,17 @@ bpslaveLoop <- function(master)
                 file <- textConnection("sout", "w", local=TRUE)
                 sink(file, type="message")
                 sink(file, type="output")
-                gc1 <- gc(reset=TRUE)
+                gc(reset=TRUE)
                 t1 <- proc.time()
                 value <- do.call(msg$data$fun, msg$data$args)
                 t2 <- proc.time()
-                gc2 <- gc()
                 node <- Sys.info()["nodename"]
                 sink(NULL, type="message")
                 sink(NULL, type="output")
                 close(file)
                 value <- list(type = "VALUE", value = value, success = success,
                               time = t2 - t1, tag = msg$data$tag, log = buffer,
-                              gc = (gc2 - gc1)[,5:6], node = node, sout = sout)
+                              gc = gc(), node = node, sout = sout)
                 parallel:::sendData(master, value)
             }
         }, interrupt = function(e) NULL)
@@ -159,7 +158,7 @@ bprunMPIslave <- function() {
         message(sprintf("Success: %s", d$value$success))
         message("Task duration: ")
         print(d$value$time)
-        message("Change in max memory used: ")
+        message("Memory used: ")
         print(d$value$gc)
         message("Log messages:")
         message(d$value$log)
@@ -241,7 +240,7 @@ bpdynamicClusterApply <- function(cl, fun, n, argfun, BPPARAM, progress)
                 }
                 .bpwriteLog(con, d)
             } else if (length(msg <- d$value$sout)) {
-                cat(paste(msg, collapse="\n"), "\n")
+                    cat(paste(msg, collapse="\n"), "\n")
             }
 
             ## write results 
@@ -267,7 +266,6 @@ bpdynamicClusterApply <- function(cl, fun, n, argfun, BPPARAM, progress)
             }
         }
     }
-
     ## return results 
     if (!is.na(resdir))
         NULL 
@@ -375,7 +373,7 @@ bpdynamicClusterIterate <- function(cl, fun, ITER, REDUCE, init,
             }
             .bpwriteLog(con, d)
         } else if (length(msg <- d$value$sout)) {
-            cat(paste(msg, collapse="\n"), "\n")
+                cat(paste(msg, collapse="\n"), "\n")
         }
 
         ## reduce
