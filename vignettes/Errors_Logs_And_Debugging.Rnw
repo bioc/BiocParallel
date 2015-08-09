@@ -76,7 +76,7 @@ be notified of an error before all runs complete.
 
 \Rcode{stop.on.error} is \Rcode{FALSE} by default.
 
-<<errors_constructor>>=
+<<errors_constructor, eval=FALSE>>=
 param <- SnowParam()
 param
 @
@@ -84,7 +84,7 @@ param
 The field can be set when constructing the param or modified with the 
 \Rcode{bpstopOnError} accessor.
 
-<<errors_stopOnError>>=
+<<errors_stopOnError, eval=FALSE>>=
 param <- SnowParam(2, stop.on.error = TRUE)
 param
 bpstopOnError(param) <- FALSE
@@ -96,7 +96,7 @@ To more clearly demonstrate the affect of \Rcode{stop.on.error} the number of
 tasks is set equal to the length of \Rcode{X}. This forces each element of
 \Rcode{X} to be executed separately (6 tasks) vs chunked.
 
-<<errors_6tasksA_stopOnError>>=
+<<errors_6tasksA_stopOnError, eval=FALSE>>=
 X <- list(1, 2, "3", 4, 5, 6)
 param <- SnowParam(3, tasks = length(X), stop.on.error = TRUE)
 @
@@ -104,7 +104,7 @@ param <- SnowParam(3, tasks = length(X), stop.on.error = TRUE)
 The output list contains results for tasks 1 and 2 and an error for task 3.
 Tasks 4, 5, and 6 are not attempted.
 
-<<errors_6tasksB_stopOnError>>=
+<<errors_6tasksB_stopOnError, eval=FALSE>>=
 bplapply(X, sqrt, BPPARAM = param)
 @
 
@@ -114,7 +114,7 @@ split as evenly as possible across the number of workers. There are 3
 workers so the first task consists of list(1, 2), the second is list("3", 4) 
 and the third is list(5, 6). 
 
-<<errors_3tasksA_stopOnError>>=
+<<errors_3tasksA_stopOnError, eval=FALSE>>=
 X <- list(1, 2, "3", 4, 5, 6)
 param <- SnowParam(3, stop.on.error = TRUE)
 @
@@ -122,14 +122,14 @@ param <- SnowParam(3, stop.on.error = TRUE)
 To simulate a longer running computation sleep time is added to 'FUN'. The
 sleep forces task 2 to finish before task 3.
 
-<<errors_3tasks_fun_stopOnError>>=
+<<errors_3tasks_fun_stopOnError, eval=FALSE>>=
 FUN <- function(i) { Sys.sleep(i); sqrt(i) }
 @
 
 The output shows an error in task 2 (vs 3 in the previous example) and a result
 for '4' is included because it was part of the second task.
 
-<<errors_3tasksB_stopOnError>>=
+<<errors_3tasksB_stopOnError, eval=FALSE>>=
 bplapply(X, FUN, BPPARAM = param)
 @
 
@@ -147,14 +147,14 @@ workers.
 The \Rcode{bpok()} function is a quick way to determine which (if any)
 tasks failed. In this example the second element fails.
 
-<<errors_bpok_bplapply>>=
+<<errors_bpok_bplapply, eval=FALSE>>=
 res <- bplapply(list(1, "2", 3), sqrt)
 res
 @
 
 \Rcode{bpok} returns TRUE if the task was successful.
 
-<<errors_bpok>>=
+<<errors_bpok, eval=FALSE>>=
 bpok(res)
 @
 
@@ -162,7 +162,7 @@ Once errors are identified with \Rcode{bpok} the traceback can be retrieved
 with the \Rcode{attr} function. This is possible because errors are returned
 as \Rcode{condition} objects with the traceback as an attribute.
 
-<<errors_traceback>>=
+<<errors_traceback, eval=FALSE>>=
 fail <- !bpok(res)
 tail(attr(res[[2]], "traceback"))
 @
@@ -178,7 +178,7 @@ elements are identified, recomputed and inserted into the original results.
 The bug in this example is the second element of 'X' which is a character when
 it should be numeric.
 
-<<errors_BPREDO>>=
+<<errors_BPREDO, eval=FALSE>>=
 X <- list(1, "2", 3)
 res <- bplapply(X, sqrt)
 res
@@ -186,14 +186,14 @@ res
 
 First fix the input data.
 
-<<errors_BPREDO_input>>=
+<<errors_BPREDO_input, eval=FALSE>>=
 X.redo <- list(1, 2, 3)
 @
 
 Repeat the call to \Rcode{bplapply} this time supplying the partial results
 as \Rcode{BPREDO}.
 
-<<errors_BPREDO_recall>>=
+<<errors_BPREDO_recall, eval=FALSE>>=
 bplapply(X.redo, sqrt, BPREDO = res)
 @
 
@@ -225,14 +225,14 @@ and node information. Output to stderr and stdout is also captured.
 
 By default \Rcode{log} is FALSE and \Rcode{threshold} is {\it INFO}.
 
-<<logs_constructor>>=
+<<logs_constructor, eval=FALSE>>=
 param <- SnowParam()
 param
 @
 
 Turn logging on and set the threshold to {\it TRACE}.
 
-<<logs_accessors>>=
+<<logs_accessors, eval=FALSE>>=
 bplog(param) <- TRUE
 bpthreshold(param) <- "TRACE"
 param
@@ -250,7 +250,7 @@ In this code chunk an {\it INFO}-level message is emitted when
 \CRANpkg{futile.logger} is loaded on the workers and a {\it ERROR}-level
 message when attempting the square root of a character ("2"). 
 
-<<logs_bplapply>>=
+<<logs_bplapply, eval=FALSE>>=
 bpthreshold(param) <- "INFO"
 bplapply(list(1, "2", 3), sqrt, BPPARAM = param)
 @
@@ -259,7 +259,7 @@ All user-supplied messages written in the \CRANpkg{futile.logger} syntax
 are also captured. This function performs argument checking and includes 
 a couple of {\it WARN} and {\it DEBUG}-level messages.
 
-<<logs_FUN>>=
+<<logs_FUN, eval=FALSE>>=
 FUN <- function(i) {
   flog.debug(paste0("value of 'i': ", i))
 
@@ -277,7 +277,7 @@ FUN <- function(i) {
 
 Turn logging on and set the threshold to {\it WARN}.
 
-<<logs_WARN>>=
+<<logs_WARN, eval=FALSE>>=
 param <- SnowParam(2, log = TRUE, threshold = "WARN")
 bplapply(list(1, "2", integer()), FUN, BPPARAM = param)
 @
@@ -285,7 +285,7 @@ bplapply(list(1, "2", integer()), FUN, BPPARAM = param)
 Changing the threshold to {\it DEBUG} catches all {\it WARN}, {\it INFO} 
 and {\it DEBUG} messages.
 
-<<logs_ERROR>>=
+<<logs_ERROR, eval=FALSE>>=
 param <- SnowParam(2, log = TRUE, threshold = "DEBUG")
 bplapply(list(1, "2", integer()), FUN, BPPARAM = param)
 @
@@ -346,14 +346,14 @@ complete a task; default is \Rcode{Inf}. If the task takes longer than
 
 Time can be changed during param construction with the \Rcode{timeout} arg,
 
-<<timeout_constructor>>=
+<<timeout_constructor, eval=FALSE>>=
 param <- SnowParam(timeout = 20)
 param
 @
 
 or with the \Rcode{bptimeout} setter:
 
-<<timeout_setter>>=
+<<timeout_setter, eval=FALSE>>=
 bptimeout(param) <- 2 
 param
 @
@@ -361,7 +361,7 @@ param
 
 A timeout error is returned if 
 
-<<timeout_bplapply>>=
+<<timeout_bplapply, eval=FALSE>>=
 fun <- function(i) {
   Sys.sleep(i)
   i
@@ -394,7 +394,7 @@ the error was thrown.
 
 This function takes the square root of the absolute value of a vector.
 
-<<debug_sqrtabs>>=
+<<debug_sqrtabs, eval=FALSE>>=
 fun1 <- function(x) {
     v <- abs(x)
     sapply(1:length(v), function(i) sqrt(v[i]))
@@ -403,27 +403,27 @@ fun1 <- function(x) {
 
 Calling ``fun1'' with a character throws an error:
 
-<<errors_bplapply>>=
+<<errors_bplapply, eval=FALSE>>=
 res <- bplapply(list(c(1,3), 5, "6"), fun1)
 res
 @
 
 Identify which elements failed with \Rcode{bpok}:
 
-<<errors_bpok_fun1>>=
+<<errors_bpok_fun1, eval=FALSE>>=
 bpok(res)
 @
 
 The error (i.e., third element of ``res'') is a \Rcode{condition} object:
 
-<<debug_condition>>=
+<<debug_condition, eval=FALSE>>=
 is(res[[3]], "condition")
 @
 
 The traceback is an attribute of the \Rcode{condition} and can be accessed with 
 the \Rcode{attr} function. 
 
-<<debug_traceback>>=
+<<debug_traceback, eval=FALSE>>=
 noquote(tail(attr(res[[3]], "traceback")))
 @
 
@@ -432,7 +432,7 @@ noquote(tail(attr(res[[3]], "traceback")))
 When a \Rcode{numeric()} is passed to ``fun1'' no formal error is thrown
 but the length of the second list element is 2 when it should be 1.
 
-<<debug_fun1>>=
+<<debug_fun1, eval=FALSE>>=
 bplapply(list(c(1,3), numeric(), 6), fun1)
 @
 
@@ -444,7 +444,7 @@ only print if the threshold is {\it DEBUG} or lower.
 ``fun2'' has debug statements that show the value of `x', length of `v' and 
 the index `i'.
 
-<<debug_fun1_debug>>=
+<<debug_fun1_debug, eval=FALSE>>=
 fun2 <- function(x) {
     v <- abs(x)
     flog.debug(
@@ -459,7 +459,7 @@ fun2 <- function(x) {
 
 Create a param that logs at a threshold level of {\it DEBUG}.
 
-<<debug_param_debug>>=
+<<debug_param_debug, eval=FALSE>>=
 param <- SnowParam(3, log = TRUE, threshold = "DEBUG")
 @
 
@@ -468,7 +468,7 @@ The index for \Rcode{sapply} is along `v' which in this case has length 0.
 This forces `i' to take values of `1' and `0' giving an output of length 2 for
 the second element (i.e., \Rcode{NA} and \Rcode{numeric(0)}).
 
-<<debug_DEBUG>>=
+<<debug_DEBUG, eval=FALSE>>=
 param <- SnowParam(3, log = TRUE, threshold = "DEBUG")
 res <- bplapply(list(c(1,3), numeric(), 6), fun2, BPPARAM = param)
 res
@@ -492,7 +492,7 @@ was hardware related but can be very useful when the bug is in the \R{} code.
 We use the now familiar square root example with a bug in the second element
 of \Rcode{X}.
 
-<<debug_sqrt>>=
+<<debug_sqrt, eval=FALSE>>=
 res <- bplapply(list(1, "2", 3), sqrt, BPPARAM = SnowParam(3))
 res
 @
@@ -501,13 +501,13 @@ res
 going into the function and not the \Rcode{sqrt} function itself. We can
 write a small wrapper around \Rcode{sqrt} so we can see the input.
 
-<<debug_sqrt_wrap>>=
+<<debug_sqrt_wrap, eval=FALSE>>=
 fun3 <- function(i) sqrt(i)
 @
 
 Debug the new function:
 
-<<debug_sqrt_debug>>=
+<<debug_sqrt_debug, eval=FALSE>>=
 debug(fun3)
 @
 
