@@ -119,6 +119,5 @@ bprunMPIslave <- function() {
         .log_internal()    
         sink(NULL, type = "message")
         sink(NULL, type = "output")
-        close(con)
     } else .log_internal()
 }
